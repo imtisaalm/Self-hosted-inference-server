@@ -4,6 +4,25 @@ A reproducible configuration for serving an open-weight language model with vLLM
 
 The repository does not wrap vLLM in an additional application server. vLLM owns request scheduling, continuous batching, KV-cache management, and model execution. This repository contains launch configuration, a streaming verification client, scheduler-metric inspection, and a concurrent-request smoke test.
 
+## Runtime boundary
+
+The control plane is Python-facing because vLLM exposes its server, configuration, and scheduler through Python. The performance-critical execution path is lower level: CUDA/C++/Triton kernels execute attention, GEMM, cache movement, sampling, and other GPU operations. This repository intentionally configures and measures that runtime rather than reimplementing kernels in Python.
+
+```text
+Python configuration / API / scheduler
+              |
+              v
+      vLLM execution engine
+              |
+              v
+   C++ / CUDA / Triton kernels
+              |
+              v
+             GPU
+```
+
+This separation is typical of modern inference systems: a high-level control layer drives a compiled numerical runtime.
+
 ## Architecture
 
 ```text
