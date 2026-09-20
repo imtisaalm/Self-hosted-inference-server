@@ -9,6 +9,7 @@ set -euo pipefail
 : "${MAX_NUM_SEQS:=64}"
 : "${TENSOR_PARALLEL_SIZE:=1}"
 : "${KV_CACHE_DTYPE:=auto}"
+: "${VLLM_IMAGE:=vllm/vllm-openai:v0.29.0}"
 
 args=(
   serve "$MODEL"
@@ -45,4 +46,4 @@ if [[ -n "${HF_TOKEN:-}" ]]; then
   docker_args+=(--env "HF_TOKEN=$HF_TOKEN")
 fi
 
-exec docker "${docker_args[@]}" vllm/vllm-openai:latest "${args[@]}"
+exec docker "${docker_args[@]}" "$VLLM_IMAGE" "${args[@]}"
