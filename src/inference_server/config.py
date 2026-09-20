@@ -58,7 +58,7 @@ class ServerConfig:
             raise ValueError("tensor_parallel_size must be positive")
 
     @classmethod
-    def from_env(cls) -> "ServerConfig":
+    def from_env(cls) -> ServerConfig:
         batched = os.getenv("MAX_NUM_BATCHED_TOKENS")
         config = cls(
             model=os.getenv("MODEL", "Qwen/Qwen3-0.6B"),
