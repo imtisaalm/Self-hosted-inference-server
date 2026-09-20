@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${MODEL:=Qwen/Qwen2.5-1.5B-Instruct}"
+: "${MODEL:=Qwen/Qwen3-0.6B}"
 : "${SERVED_MODEL_NAME:=local-model}"
 : "${HOST:=0.0.0.0}"
 : "${PORT:=8000}"
@@ -23,6 +23,10 @@ args=(
   --kv-cache-dtype "$KV_CACHE_DTYPE"
   --tensor-parallel-size "$TENSOR_PARALLEL_SIZE"
 )
+
+if [[ -n "${MAX_NUM_BATCHED_TOKENS:-}" ]]; then
+  args+=(--max-num-batched-tokens "$MAX_NUM_BATCHED_TOKENS")
+fi
 
 if [[ "$ENABLE_PREFIX_CACHING" == "1" ]]; then
   args+=(--enable-prefix-caching)
