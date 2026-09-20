@@ -8,6 +8,8 @@ import statistics
 import threading
 import time
 
+import httpx
+
 from inference_server.client import stream_chat
 from inference_server.metrics import fetch_scheduler_metrics
 
@@ -37,8 +39,9 @@ def main() -> None:
             try:
                 m = fetch_scheduler_metrics(args.url, timeout=1.0)
                 observed.append((m.running or 0.0, m.waiting or 0.0, m.kv_cache_usage or 0.0))
-            except Exception:
-                pass
+            except httpx.HTTPError:
+                # Metrics sampling is auxiliary; request execution remains authoritative.
+                continue
             stop.wait(0.05)
 
     sampler = threading.Thread(target=sample, daemon=True)
