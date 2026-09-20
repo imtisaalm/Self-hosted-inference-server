@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import time
+from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -15,12 +16,21 @@ class StreamResult:
     chunks: int
 
 
-def _content_from_chunk(payload: dict) -> str:
-    choices = payload.get("choices") or []
-    if not choices:
+def _content_from_chunk(payload: dict[str, Any]) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
         return ""
-    delta = choices[0].get("delta") or {}
-    return delta.get("content") or ""
+
+    first = choices[0]
+    if not isinstance(first, dict):
+        return ""
+
+    delta = first.get("delta")
+    if not isinstance(delta, dict):
+        return ""
+
+    content = delta.get("content")
+    return content if isinstance(content, str) else ""
 
 
 def stream_chat(
@@ -32,6 +42,9 @@ def stream_chat(
     api_key: str | None = None,
     timeout: float = 120.0,
 ) -> StreamResult:
+    if max_tokens <= 0:
+        raise ValueError("max_tokens must be positive")
+
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -48,6 +61,7 @@ def stream_chat(
     first: float | None = None
     chunks = 0
     output: list[str] = []
+
     with httpx.stream(
         "POST",
         f"{base_url.rstrip('/')}/v1/chat/completions",
@@ -59,17 +73,28 @@ def stream_chat(
         for line in response.iter_lines():
             if not line.startswith("data: "):
                 continue
+
             data = line[6:]
             if data == "[DONE]":
                 break
-            payload = json.loads(data)
+
+            try:
+                payload = json.loads(data)
+            except json.JSONDecodeError as exc:
+                raise ValueError("server emitted malformed SSE JSON") from exc
+
+            if not isinstance(payload, dict):
+                raise ValueError("server emitted a non-object SSE payload")
+
             content = _content_from_chunk(payload)
-            if content:
-                now = time.perf_counter()
-                if first is None:
-                    first = now
-                chunks += 1
-                output.append(content)
+            if not content:
+                continue
+
+            now = time.perf_counter()
+            if first is None:
+                first = now
+            chunks += 1
+            output.append(content)
 
     end = time.perf_counter()
     return StreamResult(
@@ -80,10 +105,33 @@ def stream_chat(
     )
 
 
-def list_models(base_url: str, api_key: str | None = None, timeout: float = 10.0) -> list[str]:
+def list_models(
+    base_url: str,
+    api_key: str | None = None,
+    timeout: float = 10.0,
+) -> list[str]:
     headers: dict[str, str] = {}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    response = httpx.get(f"{base_url.rstrip('/')}/v1/models", headers=headers, timeout=timeout)
+
+    response = httpx.get(
+        f"{base_url.rstrip('/')}/v1/models",
+        headers=headers,
+        timeout=timeout,
+    )
     response.raise_for_status()
-    return [item["id"] for item in response.json().get("data", [])]
+
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError("model-list response must be a JSON object")
+
+    data = payload.get("data")
+    if not isinstance(data, list):
+        raise ValueError("model-list response is missing the data array")
+
+    models: list[str] = []
+    for item in data:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            raise ValueError("model-list response contains an invalid model entry")
+        models.append(item["id"])
+    return models
