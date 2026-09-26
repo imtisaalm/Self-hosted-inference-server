@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+.env
+*.db
+*.db-wal
+*.db-shm
+*.npz
+go/streamproxy/streamproxy
+build/
+dist/
