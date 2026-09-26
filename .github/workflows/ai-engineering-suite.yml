@@ -1,0 +1,55 @@
+name: AI engineering suite
+
+on:
+  push:
+    branches: ['feat/ai-engineering-suite', main]
+    paths: ['labs/ai-engineering-suite/**', '.github/workflows/ai-engineering-suite.yml']
+  pull_request:
+    paths: ['labs/ai-engineering-suite/**', '.github/workflows/ai-engineering-suite.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-engineering-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: labs/ai-engineering-suite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - run: python -m pip install -e '.[test]'
+      - run: python -m compileall -q src tests
+      - run: PYTHONPATH=src python -m pytest -q
+      - run: go test -race ./...
+        working-directory: labs/ai-engineering-suite/go/streamproxy
+      - run: go vet ./...
+        working-directory: labs/ai-engineering-suite/go/streamproxy
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: labs/ai-engineering-suite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[test]'
+      - run: docker pull python:3.12-slim
+      - run: AIENG_DOCKER_TESTS=1 PYTHONPATH=src python -m pytest -q tests/test_docker_integration.py
